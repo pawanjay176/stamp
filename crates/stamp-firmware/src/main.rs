@@ -1,4 +1,4 @@
-//! Linkable startup scaffold; not yet qualified for flashing on the X4.
+//! USB-powered button bring-up: sample inputs and log debounced events.
 #![no_std]
 #![no_main]
 
@@ -8,6 +8,7 @@ use esp_hal::{
     delay::Delay,
     time::{Duration, Instant},
 };
+use stamp_core::input::Debouncer;
 use stamp_x4::input::ButtonContext;
 
 // Application metadata for compatibility with the ESP-IDF bootloader format.
@@ -18,13 +19,15 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     // Give the button context ADC1, both analog inputs, and the digital power input.
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    esp_println::println!("hello world");
+    esp_println::println!("Stamp input: 5 ms sampling, 20 ms debounce");
     let mut button_context = ButtonContext::new(
         peripherals.ADC1,
         peripherals.GPIO1,
         peripherals.GPIO2,
         peripherals.GPIO3,
     );
+    let mut debouncer = Debouncer::new();
+    let input_started = Instant::now();
     let delay = Delay::new();
     loop {
         // Allow up to 10 ms for a complete snapshot. ButtonContext retains
@@ -32,13 +35,13 @@ fn main() -> ! {
         let started = Instant::now();
         loop {
             match button_context.poll_buttons() {
-                Ok([front, side, power]) => {
-                    esp_println::println!(
-                        "Buttons: front={:?}, side={:?}, power={:?}",
-                        front,
-                        side,
-                        power
-                    );
+                Ok(snapshot) => {
+                    // Only complete snapshots reach the debouncer. Pending reads
+                    // must not be interpreted as released buttons.
+                    let now_ms = input_started.elapsed().as_millis();
+                    for event in debouncer.update(snapshot, now_ms).into_iter().flatten() {
+                        esp_println::println!("[{} ms] {:?}", now_ms, event);
+                    }
                     break;
                 }
                 Err(nb::Error::WouldBlock) => {
@@ -56,6 +59,6 @@ fn main() -> ! {
         }
 
         // Pace every attempt, whether it succeeded, failed, or timed out.
-        delay.delay_millis(100);
+        delay.delay_millis(5);
     }
 }
