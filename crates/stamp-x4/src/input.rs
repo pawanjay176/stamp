@@ -1,6 +1,7 @@
 //! First button-ladder exercise: raw ADC1 readings from GPIO1.
 //!
 
+use esp_hal::analog::adc::AdcCalBasic;
 // Public re-exports keep this initial scaffold compilable without unused imports.
 pub use esp_hal::{
     Blocking,
@@ -16,7 +17,7 @@ pub use esp_hal::{
 /// e.g. We can assign things like pin1 + reading 42 -> left button.
 pub struct ButtonContext<'a> {
     /// The pin we are doing the readings on.
-    pin: AdcPin<GPIO1<'a>, ADC1<'a>>,
+    pin: AdcPin<GPIO1<'a>, ADC1<'a>, AdcCalBasic<ADC1<'a>>>,
     /// The analog to digital converter in the board that gives us
     /// readings on the pin that we can use to recognize specific buttons.
     adc: Adc<'a, ADC1<'a>, Blocking>,
@@ -25,7 +26,7 @@ pub struct ButtonContext<'a> {
 impl<'a> ButtonContext<'a> {
     pub fn new(peripheral: ADC1<'a>, pin: GPIO1<'a>) -> Self {
         let mut config: _ = AdcConfig::new();
-        let pin = config.enable_pin(pin, Attenuation::_11dB);
+        let pin = config.enable_pin_with_cal(pin, Attenuation::_11dB);
         let adc = Adc::new(peripheral, config);
         Self { pin, adc }
     }
