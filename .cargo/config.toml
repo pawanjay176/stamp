@@ -1,0 +1,5 @@
+[alias]
+firmware = "build --locked -p stamp-firmware --bin stamp-firmware --features device --target riscv32imc-unknown-none-elf --release"
+
+[target.riscv32imc-unknown-none-elf]
+rustflags = ["-C", "force-frame-pointers=yes"]

@@ -1,0 +1,19 @@
+[package]
+name = "stamp-x4"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version = "1.95"
+
+[features]
+default = []
+device = ["dep:esp-hal"]
+
+[dependencies]
+stamp-core = { path = "../stamp-core" }
+
+[target.'cfg(all(target_arch = "riscv32", target_os = "none"))'.dependencies]
+esp-hal = { version = "=1.2.0", optional = true, default-features = false, features = ["esp32c3", "requires-unstable"] }
+
+[lints]
+workspace = true
