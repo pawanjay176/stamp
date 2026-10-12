@@ -21,3 +21,16 @@ pub struct ButtonContext<'a> {
     /// readings on the pin that we can use to recognize specific buttons.
     adc: Adc<'a, ADC1<'a>, Blocking>,
 }
+
+impl<'a> ButtonContext<'a> {
+    pub fn new(peripheral: ADC1<'a>, pin: GPIO1<'a>) -> Self {
+        let mut config: _ = AdcConfig::new();
+        let pin = config.enable_pin(pin, Attenuation::_11dB);
+        let adc = Adc::new(peripheral, config);
+        Self { pin, adc }
+    }
+
+    pub fn read_value(&mut self) -> nb::Result<u16, ()> {
+        self.adc.read_oneshot(&mut self.pin)
+    }
+}

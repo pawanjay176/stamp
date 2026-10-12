@@ -1191,6 +1191,7 @@ dependencies = [
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-println",
+ "nb 1.1.0",
  "stamp-core",
  "stamp-x4",
 ]
@@ -1200,6 +1201,7 @@ name = "stamp-x4"
 version = "0.1.0"
 dependencies = [
  "esp-hal",
+ "nb 1.1.0",
  "stamp-core",
 ]
 
