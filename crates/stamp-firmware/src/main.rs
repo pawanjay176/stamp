@@ -1,4 +1,4 @@
-//! USB-powered button bring-up: sample inputs and log debounced events.
+//! USB-powered display diagnostics and debounced button events.
 #![no_std]
 #![no_main]
 
@@ -9,11 +9,28 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 use stamp_core::input::Debouncer;
+use stamp_x4::display::{DisplayDriver, DisplayError};
 use stamp_x4::input::ButtonContext;
 
 // Application metadata for compatibility with the ESP-IDF bootloader format.
 // This does not install ESP-IDF, an RTOS, or a new bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
+
+fn display_test<'a>(display: &mut DisplayDriver<'a>) -> Result<(), DisplayError> {
+    esp_println::println!("Initializing display");
+    display.init_ssd1677()?;
+    esp_println::println!("Successfully initialized display");
+
+    esp_println::println!("Writing test pattern");
+    display.write_test_pattern()?;
+    esp_println::println!("Successfully wrote test pattern");
+
+    esp_println::println!("Refreshing display");
+    display.refresh_full()?;
+    esp_println::println!("Successfully refreshed display");
+
+    Ok(())
+}
 
 #[esp_hal::main]
 fn main() -> ! {
@@ -29,6 +46,22 @@ fn main() -> ! {
     let mut debouncer = Debouncer::new();
     let input_started = Instant::now();
     let delay = Delay::new();
+    // Retain the driver so its owned pins remain configured after the probe.
+    let mut display = DisplayDriver::new(
+        peripherals.SPI2,
+        peripherals.GPIO8,
+        peripherals.GPIO10,
+        peripherals.GPIO21,
+        peripherals.GPIO4,
+        peripherals.GPIO5,
+        peripherals.GPIO6,
+        peripherals.GPIO12,
+    )
+    .unwrap();
+
+    if let Err(e) = display_test(&mut display) {
+        esp_println::println!("Failed display test {:?}", e);
+    }
     loop {
         // Allow up to 10 ms for a complete snapshot. ButtonContext retains
         // partial progress if we pause and retry on the next iteration.
