@@ -10,6 +10,8 @@
 use stamp_core::display::DisplayGeometry;
 
 #[cfg(all(feature = "device", target_arch = "riscv32", target_os = "none"))]
+pub mod display;
+#[cfg(all(feature = "device", target_arch = "riscv32", target_os = "none"))]
 pub mod input;
 
 pub const DISPLAY_GEOMETRY: DisplayGeometry = DisplayGeometry {
