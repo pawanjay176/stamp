@@ -12,6 +12,13 @@ pub enum DisplayError {
     BusyTimeout,
 }
 
+/// Raw diagnostic response, not a confirmed controller identity.
+#[derive(Debug)]
+pub struct DisplayProbe {
+    pub status: u8,
+    pub version: [u8; 5],
+}
+
 /// A container that is used for interacting with the display controller from
 /// the chip.
 pub struct DisplayDriver<'a> {
@@ -54,7 +61,7 @@ impl<'a> DisplayDriver<'a> {
         let spi = Spi::new(spi_peripheral, Config::default())
             .map_err(|_| "failed to apply config")?
             .with_sck(clock)
-            .with_mosi(data);
+            .with_sio0(data);
         let command_data = Output::new(
             command_data,
             esp_hal::gpio::Level::Low,
@@ -72,12 +79,80 @@ impl<'a> DisplayDriver<'a> {
         })
     }
 
+    /// Restart the display controller before reading diagnostic registers.
+    /// Timing follows the pinned FreeInk probe's longer identification reset.
+    pub fn reset_for_probe(&mut self) {
+        let delay = Delay::new();
+        self.display_select.set_high();
+        self.sd_select.set_high();
+
+        // Establish the released level, then hold the controller in reset.
+        self.reset.set_high();
+        delay.delay_millis(2);
+        self.reset.set_low();
+        delay.delay_millis(50);
+
+        // Release reset and allow startup before attempting register reads.
+        // Busy polarity is not known yet, so this uses a fixed settling delay.
+        self.reset.set_high();
+        delay.delay_millis(30);
+    }
+
+    /// Read UC81xx diagnostic registers without requesting a screen refresh.
+    /// A successful SPI transfer does not prove that a controller answered.
+    pub fn probe(&mut self) -> Result<DisplayProbe, esp_hal::spi::Error> {
+        self.reset_for_probe();
+        let mut status = [0; 1];
+        let mut version = [0; 5];
+        self.read_command(0x71, &mut status)?;
+        self.read_command(0x70, &mut version)?;
+        Ok(DisplayProbe {
+            status: status[0],
+            version,
+        })
+    }
+
     pub fn send_command(&mut self, command: u8) -> Result<(), esp_hal::spi::Error> {
         self.command_data.set_low();
         self.display_select.set_low();
         let res = self.spi.write(&[command]);
         self.display_select.set_high();
         res
+    }
+
+    /// This is a diagnostic debug handler.
+    ///
+    /// We send a command to the display controller.
+    /// After transmitting the command, we switch the `command_data` pin to `data` mode and then
+    /// read  data over the duplex channel. This data flows from controller back
+    /// to the chip/hal that is read into `response`.
+    ///
+    /// Note: it is important that `display_select` is "on" while we receive bytes
+    /// from the controller.
+    pub fn read_command(
+        &mut self,
+        command: u8,
+        response: &mut [u8],
+    ) -> Result<(), esp_hal::spi::Error> {
+        self.command_data.set_low();
+        self.display_select.set_low();
+        let result = match self.spi.write(&[command]) {
+            Ok(()) => {
+                // Switch to data phase so that the display controller can send
+                // data over the spi.
+                self.command_data.set_high();
+                self.spi.half_duplex_read(
+                    esp_hal::spi::master::DataMode::Single,
+                    esp_hal::spi::master::Command::None,
+                    esp_hal::spi::master::Address::None,
+                    0,
+                    response,
+                )
+            }
+            Err(err) => Err(err),
+        };
+        self.display_select.set_high();
+        result
     }
 
     pub fn send_data(&mut self, data: &[u8]) -> Result<(), esp_hal::spi::Error> {
