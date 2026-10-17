@@ -1,5 +1,38 @@
 //! Hardware-independent display contracts.
 
+use embedded_graphics::{
+    mono_font::{MonoTextStyle, ascii::FONT_10X20},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    text::Text,
+};
+/// An owned, allocation-free monochrome framebuffer backed by `[u8; N]`.
+/// Set N to `ceil(WIDTH / 8) * HEIGHT`; the X4 uses 800, 480, and 48_000.
+/// Pixel bits are packed most-significant first. For our panel, BinaryColor::On
+/// (bit 1) is white and BinaryColor::Off (bit 0) is black.
+///
+/// This already implements embedded-graphics DrawTarget. Drawing changes RAM
+/// only; the board driver must upload `data()` and request a refresh separately.
+/// `new()` starts with zero bits (black). Clear to white before drawing black text.
+pub type MonochromeFramebuffer<const WIDTH: usize, const HEIGHT: usize, const N: usize> =
+    embedded_graphics::framebuffer::Framebuffer<
+        embedded_graphics::pixelcolor::BinaryColor,
+        embedded_graphics::pixelcolor::raw::RawU1,
+        embedded_graphics::pixelcolor::raw::BigEndian,
+        WIDTH,
+        HEIGHT,
+        N,
+    >;
+
+pub fn draw_message(
+    framebuffer: &mut MonochromeFramebuffer<800, 480, 48000>,
+) -> Result<(), core::convert::Infallible> {
+    framebuffer.clear(BinaryColor::On)?;
+    let text_style = MonoTextStyle::new(&FONT_10X20, BinaryColor::Off);
+    Text::new("Journey before Destination", Point::new(20, 40), text_style).draw(framebuffer)?;
+    Ok(())
+}
+
 /// Physical pixel dimensions of a display surface.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DisplayGeometry {

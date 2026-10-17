@@ -199,6 +199,18 @@ impl<'a> DisplayDriver<'a> {
         Ok(())
     }
 
+    pub fn words(&mut self, data: &[u8]) -> Result<(), DisplayError> {
+        // Begin writing primary image memory
+        self.set_full_ram_window()?;
+        self.send_command(0x24)?;
+        self.send_data(data)?;
+
+        self.set_full_ram_window()?;
+        self.send_command(0x26)?;
+        self.send_data(data)?;
+        Ok(())
+    }
+
     /// Display the previously uploaded image using the X4 full-refresh sequence.
     /// Call after initialization and uploading both image planes.
     ///

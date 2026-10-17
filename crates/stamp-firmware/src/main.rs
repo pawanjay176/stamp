@@ -8,7 +8,10 @@ use esp_hal::{
     delay::Delay,
     time::{Duration, Instant},
 };
-use stamp_core::input::Debouncer;
+use stamp_core::{
+    display::{MonochromeFramebuffer, draw_message},
+    input::Debouncer,
+};
 use stamp_x4::display::{DisplayDriver, DisplayError};
 use stamp_x4::input::ButtonContext;
 
@@ -16,13 +19,16 @@ use stamp_x4::input::ButtonContext;
 // This does not install ESP-IDF, an RTOS, or a new bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
-fn display_test<'a>(display: &mut DisplayDriver<'a>) -> Result<(), DisplayError> {
+fn display_test<'a>(
+    display: &mut DisplayDriver<'a>,
+    framebuffer: &mut MonochromeFramebuffer<800, 480, 48000>,
+) -> Result<(), DisplayError> {
     esp_println::println!("Initializing display");
     display.init_ssd1677()?;
     esp_println::println!("Successfully initialized display");
 
     esp_println::println!("Writing test pattern");
-    display.write_test_pattern()?;
+    display.words(framebuffer.data())?;
     esp_println::println!("Successfully wrote test pattern");
 
     esp_println::println!("Refreshing display");
@@ -59,7 +65,9 @@ fn main() -> ! {
     )
     .unwrap();
 
-    if let Err(e) = display_test(&mut display) {
+    let mut fb: MonochromeFramebuffer<800, 480, 48000> = MonochromeFramebuffer::new();
+    draw_message(&mut fb);
+    if let Err(e) = display_test(&mut display, &mut fb) {
         esp_println::println!("Failed display test {:?}", e);
     }
     loop {
